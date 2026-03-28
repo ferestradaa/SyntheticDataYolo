@@ -1,3 +1,4 @@
 build/ 
-cube_sdg/data_generated
-usd/
+cube_sdg/data_generated/
+usd/usd/
+usd/usd2
