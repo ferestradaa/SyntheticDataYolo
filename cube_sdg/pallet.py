@@ -2,10 +2,9 @@ from omni.isaac.kit import SimulationApp
 import os
 import argparse
 import glob
-import random
 
 parser = argparse.ArgumentParser("Dataset generator")
-parser.add_argument("--headless", action="store_true", default=True, help="Sin ventana si se pasa el flag")
+parser.add_argument("--headless", action="store_true", default=True)
 parser.add_argument("--height", type=int, default=544)
 parser.add_argument("--width",  type=int, default=960)
 parser.add_argument("--num_frames", type=int, default=7000)
@@ -14,8 +13,13 @@ parser.add_argument("--data_dir", type=str, default=os.getcwd() + "/_all_colors_
 
 args, unknown_args = parser.parse_known_args()
 
-CONFIG = {"renderer": "PathTracing", "headless": args.headless,
-          "width": args.width, "height": args.height, "num_frames": args.num_frames}
+CONFIG = {
+    "renderer": "PathTracing",
+    "headless": args.headless,
+    "width": args.width,
+    "height": args.height,
+    "num_frames": args.num_frames,
+}
 
 simulation_app = SimulationApp(launch_config=CONFIG)
 
@@ -24,32 +28,30 @@ import omni
 import omni.usd
 from omni.isaac.core.utils.nucleus import get_assets_root_path
 from omni.isaac.core.utils.stage import get_current_stage
-from pxr import Semantics
+from pxr import Usd, Sdf, UsdLux, Gf, Semantics   # un solo import
 import omni.replicator.core as rep
-import numpy as np
-from pxr import Usd, Sdf, UsdLux, Gf
 
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
 
-YELLOW_CUBE    = ['file:///home/ferestrada/synth_yolo/usd/usd/yellow3.usd']
-RED_CUBE       = ['file:///home/ferestrada/synth_yolo/usd/usd/red.usd']
-GREEN_CUBE     = ['file:///home/ferestrada/synth_yolo/usd/usd/green.usd']
-BLUE_CUBE      = ['file:///home/ferestrada/synth_yolo/usd/usd/blue.usd']
-BROWN_CUBE     = ['file:///home/ferestrada/synth_yolo/usd/usd/brown.usd']
-PURPLE_CUBE    = ['file:///home/ferestrada/synth_yolo/usd/usd/purple.usd']
-DARK_GREEN_CUBE= ['file:///home/ferestrada/synth_yolo/usd/usd/dark_green.usd']
+YELLOW_CUBE = ['file:///home/ferestrada/synth_yolo/usd/usd2/pallet_flat.usd']
 
 ALL_CUBES = {
-    "yellow":     YELLOW_CUBE,
-    "red":        RED_CUBE,
-    "green":      GREEN_CUBE,
-    "blue":       BLUE_CUBE,
-    "brown":      BROWN_CUBE,
-    "purple":     PURPLE_CUBE,      # fix: era BROWN_CUBE por error
-    "dark_green": DARK_GREEN_CUBE,
+    "yellow": YELLOW_CUBE,
 }
 
-DISTRACTORS_WAREHOUSE = 2 * [
+# Path del mesh hijo que quieres anotar DENTRO del USD
+# (relativo a como Replicator lo instancia en /Replicator/Ref_Xform_XX/Ref/...)
+# Ajusta "pallet_side1" al nombre real de tu prim hijo
+CHILD_PRIM_SUFFIX = "pallet_side1"   # ← cambia esto al nombre correcto
+
+CUBE_POSE_RANGES = {
+    "yellow": ((-0.15, 1.10, 0.75), (0.15, 1.80, 1.25)),
+}
+
+CAM_POS_MIN = (-1.00, -1.50, 0.10)
+CAM_POS_MAX = ( 1.00,  1.00, 1.20)
+
+DISTRACTORS_WAREHOUSE = 10 * [
     "/Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd",
     "/Isaac/Environments/Simple_Warehouse/Props/S_WetFloorSign.usd",
     "/Isaac/Environments/Simple_Warehouse/Props/SM_BarelPlastic_A_01.usd",
@@ -145,43 +147,38 @@ TEXTURES = [
     "/Isaac/Materials/Textures/Patterns/nv_stucco_smooth_blue.jpg",
 ]
 
-# ── Pose de cubos ──────────────────────────────────────────────────────────────
-# Los cubos se colocan sobre una "mesa virtual" alrededor de (0, 1.1-1.8, 0.75-1.55)
-# Cada color tiene un bolsillo XY ligeramente distinto para no apilarse.
-CUBE_POSE_RANGES = {
-    "yellow":    ((-0.15, 1.10, 0.75), ( 0.15, 1.80, 1.55)),
-    "red":       ((-0.30, 1.10, 0.75), ( 0.00, 1.80, 1.55)),
-    "green":     (( 0.00, 1.10, 0.75), ( 0.30, 1.80, 1.55)),
-    "blue":      ((-0.20, 1.10, 0.75), ( 0.20, 1.80, 1.55)),
-    "brown":     ((-0.25, 1.10, 0.75), ( 0.05, 1.80, 1.55)),
-    "dark_green": ((-0.05, 1.10, 0.75), ( 0.25, 1.80, 1.55)),
-    "purple":    ((-0.10, 1.10, 0.75), ( 0.10, 1.80, 1.55)),
-}
-
-
-
-CAM_POS_MIN = (-1.00, -1.50, 0.10)   # (X, Y, Z) mínimo
-CAM_POS_MAX = ( 1.00,  1.00, 3.50)   # (X, Y, Z) máximo
-
 
 def update_semantics(stage, keep_semantics=[]):
     for prim in stage.Traverse():
         if prim.HasAPI(Semantics.SemanticsAPI):
             processed_instances = set()
-            for property in prim.GetProperties():
-                is_semantic = Semantics.SemanticsAPI.IsSemanticsAPIPath(property.GetPath())
-                if is_semantic:
-                    instance_name = property.SplitName()[1]
-                    if instance_name in processed_instances:
-                        continue
-                    processed_instances.add(instance_name)
-                    sem = Semantics.SemanticsAPI.Get(prim, instance_name)
-                    type_attr = sem.GetSemanticTypeAttr()
-                    data_attr = sem.GetSemanticDataAttr()
-                    if data_attr.Get() not in keep_semantics:
-                        prim.RemoveProperty(type_attr.GetName())
-                        prim.RemoveProperty(data_attr.GetName())
-                        prim.RemoveAPI(Semantics.SemanticsAPI, instance_name)
+            for prop in prim.GetProperties():
+                if not Semantics.SemanticsAPI.IsSemanticsAPIPath(prop.GetPath()):
+                    continue
+                instance_name = prop.SplitName()[1]
+                if instance_name in processed_instances:
+                    continue
+                processed_instances.add(instance_name)
+                sem = Semantics.SemanticsAPI.Get(prim, instance_name)
+                if sem.GetSemanticDataAttr().Get() not in keep_semantics:
+                    prim.RemoveProperty(sem.GetSemanticTypeAttr().GetName())
+                    prim.RemoveProperty(sem.GetSemanticDataAttr().GetName())
+                    prim.RemoveAPI(Semantics.SemanticsAPI, instance_name)
+
+
+def fix_semantics_on_child(stage, label, child_suffix):
+    """
+    Replicator coloca el USD bajo /Replicator/Ref_Xform_XX/Ref/...
+    Esta función busca todos los prims cuyo nombre coincida con child_suffix,
+    quita la semántica del padre raíz y la pone en el hijo correcto.
+    """
+    for prim in stage.Traverse():
+        if prim.GetName() == child_suffix:
+            # Aplicar semántica en el hijo
+            sem = Semantics.SemanticsAPI.Apply(prim, "class")
+            sem.GetSemanticTypeAttr().Set("class")
+            sem.GetSemanticDataAttr().Set(label)
+            print(f"[SDG] Semántica '{label}' aplicada en: {prim.GetPath()}")
 
 
 def prefix_with_isaac_asset_server(relative_path):
@@ -204,15 +201,10 @@ def full_distractors_list(distractor_type="warehouse"):
     return full_dist_list
 
 
-def full_textures_list():
-    return [prefix_with_isaac_asset_server(t) for t in TEXTURES]
-
-
 def add_all_cubes():
     groups = {}
     for label, usd_list in ALL_CUBES.items():
-        rep_objs = [rep.create.from_usd(path, semantics=[("class", label)], count=1)
-                    for path in usd_list]
+        rep_objs = [rep.create.from_usd(path, count=1) for path in usd_list]
         groups[label] = rep.create.group(rep_objs)
     return groups
 
@@ -257,7 +249,13 @@ def main():
     cube_groups = add_all_cubes()
     rep_distractor_group = add_distractors(distractor_type=args.distractors)
 
-    update_semantics(stage=stage, keep_semantics=list(ALL_CUBES.keys()))
+    for _ in range(10):
+        simulation_app.update()
+
+
+    update_semantics(stage=stage, keep_semantics=[])          # limpia todo
+    for label in ALL_CUBES.keys():
+        fix_semantics_on_child(stage, label, CHILD_PRIM_SUFFIX)
 
     cam = rep.create.camera(clipping_range=(0.1, 1000000))
     RESOLUTION = (CONFIG["width"], CONFIG["height"])
@@ -269,29 +267,40 @@ def main():
 
         random_hdri(hdris)
 
-        # Cada cubo se mueve independientemente en su bolsillo XYZ
         for label, group in cube_groups.items():
             pos_min, pos_max = CUBE_POSE_RANGES[label]
             with group:
                 rep.modify.pose(
                     position=rep.distribution.uniform(pos_min, pos_max),
-                    rotation=rep.distribution.uniform((0, 0, 0), (360, 360, 360)),
-                    scale=(0.4, 0.4, 0.4),
+                    rotation=rep.distribution.uniform((0, 0, 0), (10, 10, 360)),
+                    scale=(2.4, 2.4, 2.4),
                 )
 
-        # Cámara con variación real de distancia en X, Y y Z
-        # look_at garantiza que los cubos siempre queden en cuadro
+
+                rep.randomizer.materials( #using only blue 
+                    rep.create.material_omnipbr(
+                        diffuse=rep.distribution.uniform(
+                            (0.0, 0.0, 0.4),   
+                            (0.0, 0.1, 1.0),  
+                        ),
+                        roughness=rep.distribution.uniform(0.2, 2.0),
+                        metallic=rep.distribution.uniform(0.0, 0.3),
+                        count=1,
+                    )
+                )
+
         with cam:
             rep.modify.pose(
                 position=rep.distribution.uniform(CAM_POS_MIN, CAM_POS_MAX),
                 look_at=all_cube_prims,
             )
             rep.modify.attribute("focalLength", rep.distribution.uniform(18.0, 50.0))
+            rep.modify.attribute("fStop", rep.distribution.uniform(600.0, 620.0))
 
         if args.distractors != "None":
             with rep_distractor_group:
                 rep.modify.pose(
-                    position=rep.distribution.uniform((-10, -10, 0), (10, 10, 0)),
+                    position=rep.distribution.uniform((-10, 0.5, 0), (10, 6, 0)),
                     rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)),
                     scale=rep.distribution.uniform(1, 1.5),
                 )
@@ -316,7 +325,10 @@ def main():
         rep.BackendDispatch.wait_until_done()
     rep.orchestrator.stop()
     simulation_app.close()
-
+'''
+    while True:
+        simulation_app.update()
+'''
 
 if __name__ == "__main__":
     try:
