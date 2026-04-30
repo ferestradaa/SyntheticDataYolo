@@ -49,15 +49,9 @@ path: $(pwd)
 train: images/train
 val: images/val
 
-nc: 7
+nc: 1
 names:
-  - yellow
-  - red
-  - green
-  - blue
-  - brown
-  - purple
-  - dark_green
+  - pallet_full
 EOF
 
 echo "[OK] data.yaml created in $(pwd)/data.yaml"

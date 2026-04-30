@@ -2,6 +2,7 @@ from omni.isaac.kit import SimulationApp
 import os
 import argparse
 import glob
+from pathlib import Path
 
 parser = argparse.ArgumentParser("Dataset generator")
 parser.add_argument("--headless", action="store_true", default=True)
@@ -33,10 +34,12 @@ import omni.replicator.core as rep
 
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
 
-YELLOW_CUBE = ['file:///home/ferestrada/synth_yolo/usd/usd2/pallet_flat.usd']
+REPO_ROOT = Path(__file__).parent.parent
+CAD = [f'file://{REPO_ROOT}/usd/usd2/pallet_flat.usd']
+hdri_path = str(REPO_ROOT / 'hdri')
 
 ALL_CUBES = {
-    "yellow": YELLOW_CUBE,
+    "pallet_full": CAD,
 }
 
 # Path del mesh hijo que quieres anotar DENTRO del USD
@@ -45,11 +48,11 @@ ALL_CUBES = {
 CHILD_PRIM_SUFFIX = "pallet_side1"   # ← cambia esto al nombre correcto
 
 CUBE_POSE_RANGES = {
-    "yellow": ((-0.15, 1.10, 0.75), (0.15, 1.80, 1.25)),
+    "pallet_full": ((-0.15, 1.10, 0.10), (0.15, 1.80, 1.0)),
 }
 
 CAM_POS_MIN = (-1.00, -1.50, 0.10)
-CAM_POS_MAX = ( 1.00,  1.00, 1.20)
+CAM_POS_MAX = ( 1.00,  1.00, 1.10)
 
 DISTRACTORS_WAREHOUSE = 10 * [
     "/Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd",
@@ -235,7 +238,7 @@ def random_hdri(hdri_paths):
 
 
 def main():
-    hdri_path = '/home/ferestrada/synth_yolo/hdri/'
+    hdri_path = str(REPO_ROOT / 'hdri')
     hdris = list_hdri_paths(hdri_path)
 
     omni.usd.get_context().new_stage()
@@ -272,7 +275,7 @@ def main():
             with group:
                 rep.modify.pose(
                     position=rep.distribution.uniform(pos_min, pos_max),
-                    rotation=rep.distribution.uniform((0, 0, 0), (10, 10, 360)),
+                    rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)),
                     scale=(2.4, 2.4, 2.4),
                 )
 

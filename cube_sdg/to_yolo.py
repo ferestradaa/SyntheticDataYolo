@@ -2,7 +2,8 @@ import os, glob, json, argparse
 import numpy as np
 from PIL import Image
 
-CLASS_ORDER = ["yellow", "red", "green", "blue", "brown", "purple", "dark_green"]
+#CLASS_ORDER = ["yellow", "red", "green", "blue", "brown", "purple", "dark_green"]
+CLASS_ORDER = ["pallet_full"]
 
 
 def _key_to_rgba(k: str):
