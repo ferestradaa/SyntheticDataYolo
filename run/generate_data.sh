@@ -3,11 +3,11 @@ set -e
 #path to your isaac sim installation 
 ISAAC_SIM_PATH="/home/ferestrada/Downloads/isaac-sim-std-42/"
 cd ../synthetic_data
-
+PARENT_DIR="$(dirname "$PWD")"
 SCRIPT_SDG="${PWD}/colors.py"           # python scritp to generatr SD
 SCRIPT_SPLIT="${PWD}/to_yolo.py"           #convert images to yolo dataset format
 SCRIPT_CONVERT="${PWD}/to_yolo_seg.py"     #pipeline to use segmentation dataset
-OUTPUT_DIR="${PWD}/data_generated/version2" #output for results 
+OUTPUT_DIR="${PARENT_DIR}/data_generated/version2" #output for results 
 
 cd "$ISAAC_SIM_PATH"
 ./python.sh "$SCRIPT_SDG" --height 720 --width 1280 --num_frames 15 \
