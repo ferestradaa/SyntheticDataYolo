@@ -1,13 +1,16 @@
 from omni.isaac.kit import SimulationApp
+
 import os
 import argparse
 import glob
 import random
+from pathlib import Path
+
 
 parser = argparse.ArgumentParser("Dataset generator")
 parser.add_argument("--headless", action="store_true", default=True, help="No window")
-parser.add_argument("--height", type=int, default=544)
-parser.add_argument("--width",  type=int, default=960)
+parser.add_argument("--height", type=int, default=720)
+parser.add_argument("--width",  type=int, default=1280)
 parser.add_argument("--num_frames", type=int, default=7000)
 parser.add_argument("--distractors", type=str, default="warehouse")
 parser.add_argument("--data_dir", type=str, default=os.getcwd() + "/_all_colors_data")
@@ -31,10 +34,12 @@ from pxr import Usd, Sdf, UsdLux, Gf
 
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
 
-YELLOW_CUBE    = ['file:///home/ferestrada/synth_yolo/meshes/yellow.usd']
-RED_CUBE       = ['file:///home/ferestrada/synth_yolo/meshes/red.usd']
-GREEN_CUBE     = ['file:///home/ferestrada/synth_yolo/meshes/green.usd']
-BLUE_CUBE      = ['file:///home/ferestrada/synth_yolo/meshes/blue.usd']
+REPO_ROOT = Path(__file__).parent.parent
+
+YELLOW_CUBE    = [f'file://{REPO_ROOT}/meshes/yellow.usd']
+RED_CUBE       = [f'file://{REPO_ROOT}/meshes/red.usd']
+GREEN_CUBE     = [f'file://{REPO_ROOT}/meshes/green.usd']
+BLUE_CUBE      = [f'file://{REPO_ROOT}/meshes/blue.usd']
 
 
 ALL_CUBES = {
@@ -234,7 +239,7 @@ def random_hdri(hdri_paths):
 
 
 def main():
-    hdri_path = '/home/ferestrada/synth_yolo/hdri/'
+    hdri_path = str(REPO_ROOT / 'hdri')
     hdris = list_hdri_paths(hdri_path)
 
     omni.usd.get_context().new_stage()

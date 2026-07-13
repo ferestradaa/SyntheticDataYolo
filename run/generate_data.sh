@@ -3,6 +3,7 @@ set -e
 #path to your isaac sim installation 
 ISAAC_SIM_PATH="/home/ferestrada/Downloads/isaac-sim-std-42/"
 cd ../synthetic_data
+
 PARENT_DIR="$(dirname "$PWD")"
 SCRIPT_SDG="${PWD}/colors.py"           # python scritp to generatr SD
 SCRIPT_SPLIT="${PWD}/to_yolo.py"           #convert images to yolo dataset format
@@ -49,9 +50,12 @@ path: $(pwd)
 train: images/train
 val: images/val
 
-nc: 1
+nc: 4
 names:
-  - pallet_full
+  - yellow
+  - red
+  - green
+  - blue
 EOF
 
 echo "[OK] data.yaml created in $(pwd)/data.yaml"
