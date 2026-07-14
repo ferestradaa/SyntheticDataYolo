@@ -23,11 +23,18 @@ def _rgba_array(img_pil):
     return arr
 
 
+
+
+def discover_classes(root_dir): 
+    pass
+
+
+
 def convert_folder(root_dir):
-    out_root = os.path.join(root_dir, "masks_bin")
+    out_root = os.path.join(root_dir, "masks")
     os.makedirs(out_root, exist_ok=True)
 
-    seg_pngs = sorted(glob.glob(os.path.join(root_dir, "semantic_segmentation_*.png")))
+    seg_pngs = sorted(glob.glob(os.path.join(root_dir, "instance_segmentation_*.png")))
     if not seg_pngs:
         print(f"[WARN] No semantic_segmentation_*.png in {root_dir}")
         return
@@ -40,9 +47,10 @@ def convert_folder(root_dir):
 
     for seg_path in seg_pngs:
         basename = os.path.splitext(os.path.basename(seg_path))[0]
-        num = basename.split("semantic_segmentation_")[-1]
+        num = basename.split("instance_segmentation_")[-1]
 
-        json_path = os.path.join(root_dir, f"semantic_segmentation_labels_{num}.json")
+        json_path = os.path.join(root_dir, f"instance_segmentation_semantics_mapping_{num}.json")
+        
         if not os.path.exists(json_path):
             print(f"[WARN] JSON for frame {num}: {json_path} was not found")
             continue

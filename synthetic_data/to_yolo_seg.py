@@ -5,8 +5,8 @@ import cv2
 
 
 def main(data_dir: str):
-    masks_root = (data_dir if os.path.basename(data_dir) == "masks_bin"
-                  else os.path.join(data_dir, "masks_bin"))
+    masks_root = (data_dir if os.path.basename(data_dir) == "masks"
+                  else os.path.join(data_dir, "masks"))
     labels_root = (data_dir if os.path.basename(data_dir) == "labels_yolo_seg"
                    else os.path.join(data_dir, "labels_yolo_seg"))
 

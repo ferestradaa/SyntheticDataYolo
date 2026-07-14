@@ -32,7 +32,9 @@ import omni.replicator.core as rep
 import numpy as np
 from pxr import Usd, Sdf, UsdLux, Gf
 
+
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
+
 
 REPO_ROOT = Path(__file__).parent.parent
 
@@ -49,6 +51,25 @@ ALL_CUBES = {
     "blue":       BLUE_CUBE,
 
 }
+
+CUBE_INSTANCE_COUNTS = {
+    "yellow": 2,
+    "red": 1,
+    "green": 1,
+    "blue": 1,
+}
+
+CUBE_POSE_RANGES = {
+    "yellow":    ((-0.15, 1.10, 0.75), ( 0.15, 1.80, 1.55)),
+    "red":       ((-0.30, 1.10, 0.75), ( 0.00, 1.80, 1.55)),
+    "green":     (( 0.00, 1.10, 0.75), ( 0.30, 1.80, 1.55)),
+    "blue":      ((-0.20, 1.10, 0.75), ( 0.20, 1.80, 1.55)),
+
+}
+
+CAM_POS_MIN = (-1.00, -1.50, 0.10)   # (X, Y, Z) min
+CAM_POS_MAX = ( 1.00,  1.00, 3.50)   # (X, Y, Z) max
+
 
 DISTRACTORS_WAREHOUSE = 2 * [
     "/Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd",
@@ -146,20 +167,6 @@ TEXTURES = [
     "/Isaac/Materials/Textures/Patterns/nv_stucco_smooth_blue.jpg",
 ]
 
-CUBE_POSE_RANGES = {
-    "yellow":    ((-0.15, 1.10, 0.75), ( 0.15, 1.80, 1.55)),
-    "red":       ((-0.30, 1.10, 0.75), ( 0.00, 1.80, 1.55)),
-    "green":     (( 0.00, 1.10, 0.75), ( 0.30, 1.80, 1.55)),
-    "blue":      ((-0.20, 1.10, 0.75), ( 0.20, 1.80, 1.55)),
-
-}
-
-
-
-CAM_POS_MIN = (-1.00, -1.50, 0.10)   # (X, Y, Z) min
-CAM_POS_MAX = ( 1.00,  1.00, 3.50)   # (X, Y, Z) max
-
-
 def update_semantics(stage, keep_semantics=[]):
     for prim in stage.Traverse():
         if prim.HasAPI(Semantics.SemanticsAPI):
@@ -207,7 +214,8 @@ def full_textures_list():
 def add_all_cubes():
     groups = {}
     for label, usd_list in ALL_CUBES.items():
-        rep_objs = [rep.create.from_usd(path, semantics=[("class", label)], count=1)
+        count = CUBE_INSTANCE_COUNTS.get(label, 1)
+        rep_objs = [rep.create.from_usd(path, semantics=[("class", label)], count=count)
                     for path in usd_list]
         groups[label] = rep.create.group(rep_objs)
     return groups
@@ -223,15 +231,7 @@ def list_hdri_paths(folder):
     return sorted(glob.glob(os.path.join(folder, "*.exr")))
 
 
-def random_hdri(hdri_paths):
-    dome = rep.get.prims("/World/DomeLight")
-    if dome != 0:
-        dome = rep.create.light(
-            light_type="Dome",
-            name="DomeLight",
-            rotation=(0, 0, 0),
-            intensity=5000.0,
-        )
+def random_hdri(hdri_paths, dome):
     with dome:
         rep.modify.attribute("inputs:texture:file", rep.distribution.choice(hdri_paths))
         rep.modify.pose(rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)))
@@ -241,6 +241,7 @@ def random_hdri(hdri_paths):
 def main():
     hdri_path = str(REPO_ROOT / 'hdri')
     hdris = list_hdri_paths(hdri_path)
+    
 
     omni.usd.get_context().new_stage()
     stage = get_current_stage()
@@ -249,6 +250,18 @@ def main():
         if i % 10 == 0:
             print(f"App update {i}..")
         simulation_app.update()
+
+    dome_node = rep.get.prims("/World/DomeLight")
+    dome_prims = dome_node.get_output_prims().get("prims", [])
+    if len(dome_prims) == 0:
+        dome = rep.create.light(
+            light_type="Dome",
+            name="DomeLight",
+            rotation=(0, 0, 0),
+            intensity=5000.0,
+        )
+    else: 
+        dome = dome_node
 
     cube_groups = add_all_cubes()
     rep_distractor_group = add_distractors(distractor_type=args.distractors)
@@ -263,7 +276,7 @@ def main():
 
     with rep.trigger.on_frame(num_frames=CONFIG["num_frames"]):
 
-        random_hdri(hdris)
+        random_hdri(hdris, dome)
 
         # each cube moves independently in XYZ
         for label, group in cube_groups.items():
@@ -297,7 +310,7 @@ def main():
         output_dir=output_directory,
         rgb=True,
         instance_segmentation=True,
-        semantic_segmentation=True,
+        semantic_segmentation=False,
         bounding_box_2d_tight=False,
         bounding_box_2d_loose=False,
     )
