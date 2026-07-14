@@ -139,7 +139,7 @@ def write_yaml(data_dir, class_names):
     names_block = "\n".join(f"  - {c}" for c in class_names)
 
     content = (
-        f"path: {data_dir.resolve()}\n"
+        f"path: ."
         f"train: images/train\n"
         f"val: images/val\n\n"
         f"nc: {len(class_names)}\n"
