@@ -29,19 +29,20 @@ import omni
 import omni.usd
 from omni.isaac.core.utils.nucleus import get_assets_root_path
 from omni.isaac.core.utils.stage import get_current_stage
-from pxr import Usd, Sdf, UsdLux, Gf, Semantics   
+from pxr import Usd, Sdf, UsdLux, Gf, Semantics  
 import omni.replicator.core as rep
 
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
 
 REPO_ROOT = Path(__file__).parent.parent
-CAD = [f'file://{REPO_ROOT}/usd/usd2/pallet_flat.usd']
+CAD = [f'file://{REPO_ROOT}/meshes/pallet_flat.usd']
+hdri_path = str(REPO_ROOT / 'hdri')
 
 ALL_CUBES = {
     "pallet_full": CAD,
 }
 
-CHILD_PRIM_SUFFIX = "pallet_side1"   
+CHILD_PRIM_SUFFIX = "pallet_side1"  
 
 CUBE_POSE_RANGES = {
     "pallet_full": ((-0.15, 1.10, 0.10), (0.15, 1.80, 1.0)),
@@ -166,14 +167,9 @@ def update_semantics(stage, keep_semantics=[]):
 
 
 def fix_semantics_on_child(stage, label, child_suffix):
-    """
-    Replicator coloca el USD bajo /Replicator/Ref_Xform_XX/Ref/...
-    Esta función busca todos los prims cuyo nombre coincida con child_suffix,
-    quita la semántica del padre raíz y la pone en el hijo correcto.
-    """
+
     for prim in stage.Traverse():
         if prim.GetName() == child_suffix:
-            # Aplicar semántica en el hijo
             sem = Semantics.SemanticsAPI.Apply(prim, "class")
             sem.GetSemanticTypeAttr().Set("class")
             sem.GetSemanticDataAttr().Set(label)
@@ -252,7 +248,7 @@ def main():
         simulation_app.update()
 
 
-    update_semantics(stage=stage, keep_semantics=[])         
+    update_semantics(stage=stage, keep_semantics=[])          
     for label in ALL_CUBES.keys():
         fix_semantics_on_child(stage, label, CHILD_PRIM_SUFFIX)
 
@@ -310,7 +306,7 @@ def main():
         output_dir=output_directory,
         rgb=True,
         instance_segmentation=True,
-        semantic_segmentation=True,
+        semantic_segmentation=False,
         bounding_box_2d_tight=False,
         bounding_box_2d_loose=False,
     )
