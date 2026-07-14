@@ -2,10 +2,6 @@ import os, glob, json, argparse
 import numpy as np
 from PIL import Image
 
-CLASS_ORDER = ["yellow", "red", "green", "blue"]
-#CLASS_ORDER = ["pallet_full"]
-
-
 def _key_to_rgba(k: str):
     return tuple(map(int, k.strip("()").split(",")))
 
@@ -23,24 +19,35 @@ def _rgba_array(img_pil):
     return arr
 
 
-
-
 def discover_classes(root_dir): 
-    pass
+    json_paths = sorted(glob.glob(os.path.join(root_dir, "instance_segmentation_semantics_mapping_*.json")))
+    classes = set()
+    for jp in json_paths: 
+        with open(jp) as f: 
+            raw = json.load(f)
+        for v in raw.values(): 
+            cls_name = v.get("class", "") if isinstance(v, dict) else v
+            if cls_name in ("", "BACKGROUND", "UNLABELLED"): 
+                continue
+            classes.add(cls_name)
+    return sorted(classes)
 
 
 
 def convert_folder(root_dir):
     out_root = os.path.join(root_dir, "masks")
     os.makedirs(out_root, exist_ok=True)
-
     seg_pngs = sorted(glob.glob(os.path.join(root_dir, "instance_segmentation_*.png")))
     if not seg_pngs:
         print(f"[WARN] No semantic_segmentation_*.png in {root_dir}")
         return
 
-    name2id = {cls: i for i, cls in enumerate(CLASS_ORDER)}
-    print(f"[INFO] CLASS MAP: {name2id}")
+    class_order = discover_classes(root_dir)
+    if not class_order: 
+        raise SystemExit(f"[ERROR] No class names found in json files")
+    
+    name2id = {cls: i for i, cls in enumerate(class_order)}
+    #print(f"[INFO] classes detected from json files: {name2id}")
 
     total_saved = 0
     frames_processed = 0
@@ -99,8 +106,8 @@ def convert_folder(root_dir):
 
         frames_processed += 1
 
-    with open(os.path.join(out_root, "classes.txt"), "w") as f:
-        for cls_name in CLASS_ORDER:
+    with open(os.path.join(root_dir, "classes.txt"), "w") as f:
+        for cls_name in class_order:
             f.write(f"{name2id[cls_name]}:{cls_name}\n")
 
     print(f"[OK] frames: {frames_processed} | classes: {name2id} | masks: {total_saved}")

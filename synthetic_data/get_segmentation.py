@@ -7,8 +7,8 @@ import cv2
 def main(data_dir: str):
     masks_root = (data_dir if os.path.basename(data_dir) == "masks"
                   else os.path.join(data_dir, "masks"))
-    labels_root = (data_dir if os.path.basename(data_dir) == "labels_yolo_seg"
-                   else os.path.join(data_dir, "labels_yolo_seg"))
+    labels_root = (data_dir if os.path.basename(data_dir) == "labels_raw"
+                   else os.path.join(data_dir, "labels_raw"))
 
     if not os.path.isdir(masks_root):
         raise SystemExit(f"[ERROR] No dir of masks: {masks_root}")
@@ -18,7 +18,6 @@ def main(data_dir: str):
     name_re = re.compile(r"^(\d+)_inst(\d+)\.png$", re.IGNORECASE)
 
     subs = [d for d in glob.glob(os.path.join(masks_root, "*")) if os.path.isdir(d)]
-    print(f"[INFO] subdir: {len(subs)}")
 
     total_txt = 0
     for sub in sorted(subs):
@@ -67,8 +66,8 @@ def main(data_dir: str):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser("Convierte masks_bin to labels_yolo_seg (poligons YOLO)")
+    ap = argparse.ArgumentParser("Convert masks_bin to labels_yolo_seg (poligons YOLO)")
     ap.add_argument("--data_dir", required=True,
-                    help="root del dataset o directamente masks_bin/ o labels_yolo_seg/")
+                    help="root of dataset or masks or labels_raw/")
     args = ap.parse_args()
     main(os.path.realpath(args.data_dir))
