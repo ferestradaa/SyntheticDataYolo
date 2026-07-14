@@ -2,7 +2,7 @@ set -e
 
 #path to your isaac sim installation 
 ISAAC_SIM_PATH="/home/ferestrada/Downloads/isaac-sim-std-42/"
-cd ../synthetic_data
+cd ../src
 
 PARENT_DIR="$(dirname "$PWD")"
 OUTPUT_DIR="${PARENT_DIR}/data_generated/data" #output for results 
