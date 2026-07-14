@@ -1,0 +1,43 @@
+services:
+
+  yolo:
+    build:
+      context: .. #root of project
+      dockerfile: docker/Dockerfile
+
+    container_name: yolo
+
+    network_mode: host
+
+    environment: 
+      - DISPLAY=${DISPLAY} #in case needing GUI
+      - QT_X11_NO_MITSHM=1
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+      - 'c 81:* rmw'
+
+    deploy:
+      resources:
+        reservations:
+          devices: 
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    volumes:
+      - /dev:/dev
+      - ../src:/ws/src #all proyect
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      #- /home/ferestrada/yolo_pipe/cube_sdg/data_generated/yolo_1:/ws/syn #in case needing dir for synthetic data generation
+    
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    
+
+
