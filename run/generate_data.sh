@@ -7,7 +7,7 @@ cd ../src
 PARENT_DIR="$(dirname "$PWD")"
 OUTPUT_DIR="${PARENT_DIR}/data_generated/data" #output for results 
 
-SCRIPT_SDG="${PWD}/pallet.py"           # python scritp to generatr SD
+SCRIPT_SDG="${PWD}/generate_data.py"           # python scritp to generatr SD
 SCRIPT_SPLIT="${PWD}/to_yolo.py"           #convert images to yolo dataset format
 SCRIPT_CONVERT="${PWD}/get_segmentation.py"     #get segmnentation coordinates for dataset
 SPLIT="${PWD}/split_dataset.py" #split dataset to train val data
@@ -16,7 +16,7 @@ SPLIT="${PWD}/split_dataset.py" #split dataset to train val data
 CLASSES_TXT="${OUTPUT_DIR}/classes.txt"
 
 cd "$ISAAC_SIM_PATH"
-./python.sh "$SCRIPT_SDG" --height 720 --width 1280 --num_frames 10 \
+./python.sh "$SCRIPT_SDG" --height 720 --width 1280 --num_frames 3000 \
   --distractors additional --data_dir "$OUTPUT_DIR"
 
 

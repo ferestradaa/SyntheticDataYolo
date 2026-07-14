@@ -54,9 +54,9 @@ ALL_CUBES = {
 
 CUBE_INSTANCE_COUNTS = {
     "yellow": 2,
-    "red": 1,
-    "green": 1,
-    "blue": 1,
+    "red": 2,
+    "green": 2,
+    "blue": 2,
 }
 
 CUBE_POSE_RANGES = {
@@ -67,7 +67,8 @@ CUBE_POSE_RANGES = {
 
 }
 
-CAM_POS_MIN = (-1.00, -1.50, 0.10)   # (X, Y, Z) min
+#CAM_POS_MIN = (-1.00, -1.50, 0.10)   # (X, Y, Z) min
+CAM_POS_MIN = (1.00, 1.0, 3.30)   # (X, Y, Z) min
 CAM_POS_MAX = ( 1.00,  1.00, 3.50)   # (X, Y, Z) max
 
 
@@ -284,7 +285,7 @@ def main():
             with group:
                 rep.modify.pose(
                     position=rep.distribution.uniform(pos_min, pos_max),
-                    rotation=rep.distribution.uniform((0, 0, 0), (360, 360, 360)),
+                    rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)),
                     scale=(0.4, 0.4, 0.4),
                 )
 
