@@ -32,6 +32,7 @@ services:
     volumes:
       - /dev:/dev
       - ../src:/ws/src #all proyect
+      - ../data_generated:/ws/data_generated #all proyect
       - /tmp/.X11-unix:/tmp/.X11-unix
       #- /home/ferestrada/yolo_pipe/cube_sdg/data_generated/yolo_1:/ws/syn #in case needing dir for synthetic data generation
     
