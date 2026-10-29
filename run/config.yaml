@@ -1,0 +1,19 @@
+#edit this config file so you can tune your generated data
+
+task: segment            # segment (xypolygons) or  detect (bboxes)
+data_dir: data_generated/data_1000 #dir where the generated data is genereted
+
+assets:                  # one .usd per object to detect, class name = file name without extension
+  - meshes/car_key.usd
+  - path: meshes/cereal_box.usd
+    lying: 0.6           # chance of resting on one side instead of standing, the others always stand
+  - meshes/kitchen_blender.usd
+  - meshes/potted_plant.usd
+
+instances_per_asset: 3   # copies of each asset spawned, each frame shows between 0 and this many of each
+
+num_frames: 1000 #how many images to generate
+width: 960               # square render, every frame is then cropped to a random phone aspect
+height: 960
+distractors: additional  # warehouse
+train_ratio: 0.9 #split in train and val (90% train defualt)
