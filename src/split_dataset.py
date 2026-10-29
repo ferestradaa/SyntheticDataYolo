@@ -4,6 +4,8 @@ import random
 import shutil
 from pathlib import Path
 
+from config import load_config, resolve, DEFAULT_CONFIG
+
 
 def build_pairs(data_dir):
     # find all label txt files and check that a matching png exists
@@ -139,7 +141,6 @@ def write_yaml(data_dir, class_names):
     names_block = "\n".join(f"  - {c}" for c in class_names)
 
     content = (
-        f"path: ."
         f"train: images/train\n"
         f"val: images/val\n\n"
         f"nc: {len(class_names)}\n"
@@ -150,8 +151,9 @@ def write_yaml(data_dir, class_names):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", required=True)
-    parser.add_argument("--train_ratio", type=float, default=0.9)
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--data_dir", help="default: from config")
+    parser.add_argument("--train_ratio", type=float, help="default: from config")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--clean",
@@ -160,14 +162,16 @@ def main():
     )
     args = parser.parse_args()
 
-    data_dir = Path(args.data_dir)
+    cfg = load_config(args.config)
+    data_dir = Path(args.data_dir) if args.data_dir else resolve(cfg["data_dir"])
+    train_ratio = args.train_ratio if args.train_ratio is not None else cfg["train_ratio"]
     class_names = read_classes_txt(data_dir)
 
     pairs = build_pairs(data_dir)
     if not pairs:
         raise SystemExit(f"no image/label pairs found in {data_dir}")
 
-    train, val = split_pairs(pairs, args.train_ratio, args.seed)
+    train, val = split_pairs(pairs, train_ratio, args.seed)
 
     make_dirs(data_dir)
     link_split(data_dir, train, "train")
@@ -180,7 +184,7 @@ def main():
 
     if args.clean:
         keep_dirs = {"images", "labels", "sample_check"}
-        keep_files = {"data.yaml", "classes.txt"}
+        keep_files = {"data.yaml", "classes.txt", "frames_meta.json"}
         sample_base = find_full_coverage_sample(data_dir, pairs, len(class_names))
         save_sample_and_clean(data_dir, sample_base, keep_dirs, keep_files)
         print(f"[OK] raw cleaned, sample saved at {data_dir / 'sample_check'} (base: {sample_base})")
