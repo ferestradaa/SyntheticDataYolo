@@ -9,8 +9,8 @@ import yaml
 
 from config import load_config, resolve, DEFAULT_CONFIG
 
-DARK_LUMA = 25            # mean luminance below this is an unusable frame
-TINY_AREA = 0.0002        # fraction of the image, smaller labels are not worth learning from
+DARK_LUMA = 25
+TINY_AREA = 0.0002        # fraction of the image
 WASHED_STD = 8.0          # an object clipped to white or crushed to black keeps no internal contrast
 
 
@@ -55,7 +55,7 @@ def main(data_dir):
             if any(info["visible"].get(name, 0) == 0 for name in areas):
                 problems["unexpected_class"].append(frame)   # a class that was hidden shows up: frames and metadata are misaligned
             if any(name not in areas for name in info["focus"]):
-                problems["focus_missing"].append(frame)   # the framed object has no label: lost or fully occluded
+                problems["focus_missing"].append(frame)
             if not labels and not info["negative"]:
                 problems["empty_not_negative"].append(frame)
             if areas and max(areas.values()) < TINY_AREA:

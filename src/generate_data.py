@@ -43,7 +43,9 @@ import numpy as np
 from pxr import Usd, UsdGeom, Sdf, UsdLux, Gf
 
 
-import domain_randomization as dr
+import usd_scene
+from camera_effects import apply_camera_effects
+from domain_randomization import SceneRandomizer
 
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
 if cfg.get("seed") is not None:
@@ -251,14 +253,14 @@ def main():
     RESOLUTION = (CONFIG["width"], CONFIG["height"])
     render_product = rep.create.render_product(cam, RESOLUTION)
 
-    surfaces = dr.add_surfaces()
+    surfaces = usd_scene.add_surfaces()
     textures = full_textures_list()
     for _ in range(5):
         simulation_app.update()   # let the referenced prims load so their bounds can be measured
-    randomizer = dr.SceneRandomizer(stage, assets, RESOLUTION, hdris=hdris, seed=cfg.get("seed"))
+    randomizer = SceneRandomizer(stage, assets, RESOLUTION, hdris=hdris, seed=cfg.get("seed"))
 
     with rep.trigger.on_frame():
-        dr.randomize_surfaces(surfaces, textures)   # material swapping stays in the graph, the dome is driven per frame from python
+        usd_scene.randomize_surfaces(surfaces, textures)   # textures stay in the graph, the dome is driven per frame from python
 
     output_directory = str(resolve(args.data_dir))
     writer = rep.WriterRegistry.get("BasicWriter")
@@ -282,7 +284,7 @@ def main():
 
     with open(os.path.join(output_directory, "frames_meta.json"), "w") as f:   # what each frame was supposed to show, used by validate_dataset.py
         json.dump(frames_meta, f)
-    dr.apply_camera_effects(output_directory, cfg.get("seed"))
+    apply_camera_effects(output_directory, cfg.get("seed"))
     simulation_app.close()
 
 
