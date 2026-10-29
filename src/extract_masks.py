@@ -2,6 +2,8 @@ import os, glob, json, argparse
 import numpy as np
 from PIL import Image
 
+from config import load_config, resolve, DEFAULT_CONFIG
+
 def _key_to_rgba(k: str):
     return tuple(map(int, k.strip("()").split(",")))
 
@@ -115,6 +117,8 @@ def convert_folder(root_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, required=True)
+    parser.add_argument("--config", type=str, default=str(DEFAULT_CONFIG))
+    parser.add_argument("--data_dir", type=str, help="default: from config")
     args, _ = parser.parse_known_args()
-    convert_folder(os.path.realpath(args.data_dir))
+    cfg = load_config(args.config)
+    convert_folder(os.path.realpath(args.data_dir or resolve(cfg["data_dir"])))
