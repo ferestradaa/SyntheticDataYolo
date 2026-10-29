@@ -5,6 +5,6 @@ __pycache__/
 *.pyc
 .thumbs/
 
-# fuentes de los assets (no van en el repo final; solo meshes/ resultante)
+# asset sources, only the resulting meshes/ belong in the repo
 blender/
 img/
