@@ -1,21 +1,31 @@
 from omni.isaac.kit import SimulationApp
 
+import json
 import os
+import sys
 import argparse
 import glob
-import random
 from pathlib import Path
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config import load_config, resolve, DEFAULT_CONFIG
+
 parser = argparse.ArgumentParser("Dataset generator")
+parser.add_argument("--config", type=str, default=str(DEFAULT_CONFIG))
 parser.add_argument("--headless", action="store_true", default=True, help="No window")
-parser.add_argument("--height", type=int, default=720)
-parser.add_argument("--width",  type=int, default=1280)
-parser.add_argument("--num_frames", type=int, default=7000)
-parser.add_argument("--distractors", type=str, default="warehouse")
-parser.add_argument("--data_dir", type=str, default=os.getcwd() + "/_all_colors_data")
+parser.add_argument("--height", type=int)   # height, width, num_frames, distractors and data_dir override the config
+parser.add_argument("--width",  type=int)
+parser.add_argument("--num_frames", type=int)
+parser.add_argument("--distractors", type=str)
+parser.add_argument("--data_dir", type=str)
 
 args, unknown_args = parser.parse_known_args()
+
+cfg = load_config(args.config)
+for key in ("height", "width", "num_frames", "distractors", "data_dir"):
+    if getattr(args, key) is None:
+        setattr(args, key, cfg[key])
 
 CONFIG = {"renderer": "PathTracing", "headless": args.headless,
           "width": args.width, "height": args.height, "num_frames": args.num_frames}
@@ -30,46 +40,19 @@ from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Semantics
 import omni.replicator.core as rep
 import numpy as np
-from pxr import Usd, Sdf, UsdLux, Gf
+from pxr import Usd, UsdGeom, Sdf, UsdLux, Gf
 
+
+import domain_randomization as dr
 
 rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
+if cfg.get("seed") is not None:
+    rep.set_global_seed(cfg["seed"])
 
+RT_SUBFRAMES = 4
 
-REPO_ROOT = Path(__file__).parent.parent
-
-YELLOW_CUBE    = [f'file://{REPO_ROOT}/meshes/yellow.usd']
-RED_CUBE       = [f'file://{REPO_ROOT}/meshes/red.usd']
-GREEN_CUBE     = [f'file://{REPO_ROOT}/meshes/green.usd']
-BLUE_CUBE      = [f'file://{REPO_ROOT}/meshes/blue.usd']
-
-
-ALL_CUBES = {
-    "yellow":     YELLOW_CUBE,
-    "red":        RED_CUBE,
-    "green":      GREEN_CUBE,
-    "blue":       BLUE_CUBE,
-
-}
-
-CUBE_INSTANCE_COUNTS = {
-    "yellow": 2,
-    "red": 2,
-    "green": 2,
-    "blue": 2,
-}
-
-CUBE_POSE_RANGES = {
-    "yellow":    ((-0.15, 1.10, 0.75), ( 0.15, 1.80, 1.55)),
-    "red":       ((-0.30, 1.10, 0.75), ( 0.00, 1.80, 1.55)),
-    "green":     (( 0.00, 1.10, 0.75), ( 0.30, 1.80, 1.55)),
-    "blue":      ((-0.20, 1.10, 0.75), ( 0.20, 1.80, 1.55)),
-
-}
-
-#CAM_POS_MIN = (-1.00, -1.50, 0.10)   # (X, Y, Z) min
-CAM_POS_MIN = (1.00, 1.0, 3.30)   # (X, Y, Z) min
-CAM_POS_MAX = ( 1.00,  1.00, 3.50)   # (X, Y, Z) max
+ASSET_PATHS = cfg["assets"]
+INSTANCES_PER_ASSET = cfg["instances_per_asset"]
 
 
 DISTRACTORS_WAREHOUSE = 2 * [
@@ -212,14 +195,24 @@ def full_textures_list():
     return [prefix_with_isaac_asset_server(t) for t in TEXTURES]
 
 
-def add_all_cubes():
-    groups = {}
-    for label, usd_list in ALL_CUBES.items():
-        count = CUBE_INSTANCE_COUNTS.get(label, 1)
-        rep_objs = [rep.create.from_usd(path, semantics=[("class", label)], count=count)
-                    for path in usd_list]
-        groups[label] = rep.create.group(rep_objs)
-    return groups
+def load_assets():
+    assets = {}
+    for entry in ASSET_PATHS:
+        rel, lying = (entry, 0.0) if isinstance(entry, str) else (entry["path"], entry.get("lying", 0.0))
+        path = resolve(rel).resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"Asset not found: {path}")
+        stage = Usd.Stage.Open(str(path))
+        cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_])
+        box = cache.ComputeWorldBound(stage.GetDefaultPrim()).ComputeAlignedRange()
+        assets[path.stem] = {"url": f"file://{path}", "bbox_min": np.array(box.GetMin()), "bbox_max": np.array(box.GetMax()), "lying": lying}
+        print(f"[asset] {path.stem}: size={tuple(round(x, 3) for x in box.GetSize())} m, lying {lying}")
+    return assets
+
+
+def add_all_assets(assets):
+    for label, asset in assets.items():
+        rep.create.from_usd(asset["url"], semantics=[("class", label)], count=INSTANCES_PER_ASSET)
 
 
 def add_distractors(distractor_type="warehouse"):
@@ -232,15 +225,8 @@ def list_hdri_paths(folder):
     return sorted(glob.glob(os.path.join(folder, "*.exr")))
 
 
-def random_hdri(hdri_paths, dome):
-    with dome:
-        rep.modify.attribute("inputs:texture:file", rep.distribution.choice(hdri_paths))
-        rep.modify.pose(rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)))
-        rep.modify.attribute("exposure", rep.distribution.uniform(-7.0, 0.0))
-
-
 def main():
-    hdri_path = str(REPO_ROOT / 'hdri')
+    hdri_path = str(resolve('hdri'))
     hdris = list_hdri_paths(hdri_path)
     
 
@@ -252,60 +238,29 @@ def main():
             print(f"App update {i}..")
         simulation_app.update()
 
-    dome_node = rep.get.prims("/World/DomeLight")
-    dome_prims = dome_node.get_output_prims().get("prims", [])
-    if len(dome_prims) == 0:
-        dome = rep.create.light(
-            light_type="Dome",
-            name="DomeLight",
-            rotation=(0, 0, 0),
-            intensity=5000.0,
-        )
-    else: 
-        dome = dome_node
+    if not rep.get.prims("/World/DomeLight").get_output_prims().get("prims", []):
+        rep.create.light(light_type="Dome", name="DomeLight", rotation=(0, 0, 0), intensity=5000.0)   # the randomizer drives it per frame
 
-    cube_groups = add_all_cubes()
-    rep_distractor_group = add_distractors(distractor_type=args.distractors)
+    assets = load_assets()
+    add_all_assets(assets)
+    add_distractors(distractor_type=args.distractors)
 
-    update_semantics(stage=stage, keep_semantics=list(ALL_CUBES.keys()))
+    update_semantics(stage=stage, keep_semantics=list(assets.keys()))
 
     cam = rep.create.camera(clipping_range=(0.1, 1000000))
     RESOLUTION = (CONFIG["width"], CONFIG["height"])
     render_product = rep.create.render_product(cam, RESOLUTION)
 
-    all_cube_prims = rep.create.group(list(cube_groups.values()))
+    surfaces = dr.add_surfaces()
+    textures = full_textures_list()
+    for _ in range(5):
+        simulation_app.update()   # let the referenced prims load so their bounds can be measured
+    randomizer = dr.SceneRandomizer(stage, assets, RESOLUTION, hdris=hdris, seed=cfg.get("seed"))
 
-    with rep.trigger.on_frame(num_frames=CONFIG["num_frames"]):
+    with rep.trigger.on_frame():
+        dr.randomize_surfaces(surfaces, textures)   # material swapping stays in the graph, the dome is driven per frame from python
 
-        random_hdri(hdris, dome)
-
-        # each cube moves independently in XYZ
-        for label, group in cube_groups.items():
-            pos_min, pos_max = CUBE_POSE_RANGES[label]
-            with group:
-                rep.modify.pose(
-                    position=rep.distribution.uniform(pos_min, pos_max),
-                    rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)),
-                    scale=(0.4, 0.4, 0.4),
-                )
-
-        
-        with cam:
-            rep.modify.pose(
-                position=rep.distribution.uniform(CAM_POS_MIN, CAM_POS_MAX),
-                look_at=all_cube_prims,
-            )
-            rep.modify.attribute("focalLength", rep.distribution.uniform(18.0, 50.0))
-
-        if args.distractors != "None":
-            with rep_distractor_group:
-                rep.modify.pose(
-                    position=rep.distribution.uniform((-10, -10, 0), (10, 10, 0)),
-                    rotation=rep.distribution.uniform((0, 0, 0), (0, 0, 360)),
-                    scale=rep.distribution.uniform(1, 1.5),
-                )
-
-    output_directory = args.data_dir
+    output_directory = str(resolve(args.data_dir))
     writer = rep.WriterRegistry.get("BasicWriter")
     writer.initialize(
         output_dir=output_directory,
@@ -317,13 +272,17 @@ def main():
     )
     writer.attach([render_product])
 
-    rep.orchestrator.run()
-    while not rep.orchestrator.get_is_started():
-        simulation_app.update()
-    while rep.orchestrator.get_is_started():
-        simulation_app.update()
-        rep.BackendDispatch.wait_until_done()
+    frames_meta = []
+    for frame in range(args.num_frames):
+        frames_meta.append(randomizer.randomize_frame())   # assets, camera, distractors and lights are placed here, the graph only does hdri and surface textures
+        rep.orchestrator.step(rt_subframes=RT_SUBFRAMES)
+    rep.orchestrator.wait_until_complete()
+    rep.BackendDispatch.wait_until_done()
     rep.orchestrator.stop()
+
+    with open(os.path.join(output_directory, "frames_meta.json"), "w") as f:   # what each frame was supposed to show, used by validate_dataset.py
+        json.dump(frames_meta, f)
+    dr.apply_camera_effects(output_directory, cfg.get("seed"))
     simulation_app.close()
 
 
