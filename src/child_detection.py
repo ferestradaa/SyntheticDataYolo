@@ -173,7 +173,6 @@ def fix_semantics_on_child(stage, label, child_suffix):
             sem = Semantics.SemanticsAPI.Apply(prim, "class")
             sem.GetSemanticTypeAttr().Set("class")
             sem.GetSemanticDataAttr().Set(label)
-            print(f"[SDG] Semántica '{label}' aplicada en: {prim.GetPath()}")
 
 
 def prefix_with_isaac_asset_server(relative_path):
