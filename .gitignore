@@ -8,3 +8,4 @@ __pycache__/
 # asset sources, only the resulting meshes/ belong in the repo
 blender/
 img/
+tests/videos/
