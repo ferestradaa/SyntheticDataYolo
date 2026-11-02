@@ -22,17 +22,7 @@ def mask_to_polygons(binm, W, H):
     return out
 
 
-def mask_to_box(binm, W, H):
-    ys, xs = np.nonzero(binm)   # one box around every visible pixel, an occluded instance still gets a single box
-    if len(xs) < 10:
-        return []
-    x0, x1 = xs.min(), xs.max() + 1
-    y0, y1 = ys.min(), ys.max() + 1
-    return [f"{(x0 + x1) / 2 / W:.6f} {(y0 + y1) / 2 / H:.6f} "
-            f"{(x1 - x0) / W:.6f} {(y1 - y0) / H:.6f}"]
-
-
-def main(data_dir: str, task: str):
+def main(data_dir: str):
     masks_root = (data_dir if os.path.basename(data_dir) == "masks"
                   else os.path.join(data_dir, "masks"))
     labels_root = (data_dir if os.path.basename(data_dir) == "labels_raw"
@@ -70,8 +60,7 @@ def main(data_dir: str, task: str):
             if H is None or W is None:
                 H, W = binm.shape[:2]
 
-            convert = mask_to_polygons if task == "segment" else mask_to_box
-            lines += [f"{cls_id} {geom}" for geom in convert(binm, W, H)]
+            lines += [f"{cls_id} {geom}" for geom in mask_to_polygons(binm, W, H)]
 
         with open(out_txt, "w") as f:   # empty file for frames without objects, YOLO reads them as negatives
             f.write("\n".join(lines) + ("\n" if lines else ""))
@@ -81,10 +70,9 @@ def main(data_dir: str, task: str):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser("Convert instance masks to YOLO labels (polygons or boxes)")
+    ap = argparse.ArgumentParser("Convert instance masks to YOLO polygon labels")
     ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--data_dir", help="root of dataset or masks or labels_raw/ (default: from config)")
-    ap.add_argument("--task", choices=["segment", "detect"], help="default: from config")
     args = ap.parse_args()
     cfg = load_config(args.config)
-    main(os.path.realpath(args.data_dir or resolve(cfg["data_dir"])), args.task or cfg["task"])
+    main(os.path.realpath(args.data_dir or resolve(cfg["data_dir"])))

@@ -11,7 +11,8 @@ SPAWN_AREA = ((-0.50, 1.00), (0.50, 1.80))
 
 SIZE_JITTER = (0.8, 1.2)
 ASSET_GAP = (0.0, 0.03)
-LYING_POSES = [(90, 0), (-90, 0), (0, 90), (0, -90)]   # rotations about x and y that lay an asset on one of its sides
+LYING_PROB = 0.5        # chance a slab shaped asset rests on its widest face instead of the pose it was authored in
+SLAB_RATIO = 0.7        # a side shorter than this fraction of the next one makes the opposite face worth lying on
 TILT_JITTER = 5.0
 FREE_POSE_PROB = 0.30
 
@@ -28,7 +29,7 @@ BACKDROP_TILT = 8.0
 FOCAL_LENGTH_MM = (16.0, 55.0)
 ELEVATION_MAX_DEG = 75.0
 ELEVATION_SKEW = 2.0            # elevation = max * u ** skew, so most frames are frontal and a few look from above
-MAX_ELEVATION_DEG = 80.0
+ELEVATION_RAISED_MAX_DEG = 80.0   # ceiling once the camera has to climb to clear the support
 ROLL_SIGMA_DEG = 6.0
 ROLL_MAX_DEG = 18.0
 SHOT_WEIGHTS = {"close": 0.35, "medium": 0.40, "wide": 0.25}
@@ -44,6 +45,13 @@ PROP_PROB = 0.7
 PROPS_MAX = 6
 PROP_SCALE = (0.8, 1.3)
 FLOAT_PROP_RING = (0.25, 1.2)
+
+
+def _lying_rotation(size):
+    order = np.argsort(size)
+    if order[0] == 2 or size[order[0]] > SLAB_RATIO * size[order[1]]:
+        return None   # the shortest side already points up, or the asset is too square to rest on anything else
+    return (0, 90) if order[0] == 0 else (90, 0)   # bring the shortest side to z, so the asset lies on its widest face
 
 
 class Layout:
@@ -64,6 +72,8 @@ class SceneRandomizer:
         self.spawn_min, self.spawn_max = (np.array(c, dtype=float) for c in SPAWN_AREA)
         self.center_xy = (self.spawn_min + self.spawn_max) / 2
 
+        self.lying = {label: _lying_rotation(a["bbox_max"] - a["bbox_min"]) for label, a in assets.items()}
+
         self.instances = {}
         for label in assets:
             roots = find_instance_roots(stage, label)
@@ -71,7 +81,7 @@ class SceneRandomizer:
                 {"root": root, "ops": movable_ops(root.GetParent()), "materials": collect_materials(root)}
                 for root in roots
             ]
-            print(f"[randomizer] {label}: {len(roots)} instances")
+            print(f"[randomizer] {label}: {len(roots)} instances, lies down {self.lying[label] is not None}")
 
         asset_parents = {i["root"].GetParent().GetPath() for items in self.instances.values() for i in items}
         self.distractors = []
@@ -161,7 +171,8 @@ class SceneRandomizer:
         rng = self.rng
         if free:
             return rng.uniform(0, 360, 3)
-        rx, ry = LYING_POSES[rng.integers(len(LYING_POSES))] if rng.random() < self.assets[label]["lying"] else (0, 0)
+        lie = self.lying[label]
+        rx, ry = np.array(lie) * rng.choice([-1, 1]) if lie is not None and rng.random() < LYING_PROB else (0, 0)
         tilt = rng.uniform(-TILT_JITTER, TILT_JITTER, 2)
         return np.array([rx + tilt[0], ry + tilt[1], rng.uniform(0, 360)])
 
@@ -248,7 +259,7 @@ class SceneRandomizer:
             distance = max(needed.max() * margin, DISTANCE_MIN)
             if distance * math.sin(elevation) >= raise_to:
                 break
-            elevation = math.asin(min(raise_to / distance, math.sin(math.radians(MAX_ELEVATION_DEG))))
+            elevation = math.asin(min(raise_to / distance, math.sin(math.radians(ELEVATION_RAISED_MAX_DEG))))
 
         eye = center + distance * toward_camera
         roll = math.radians(float(np.clip(self.rng.normal(0, ROLL_SIGMA_DEG), -ROLL_MAX_DEG, ROLL_MAX_DEG)))

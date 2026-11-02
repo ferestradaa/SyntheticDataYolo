@@ -8,10 +8,7 @@ DEFAULT_CONFIG = REPO_ROOT / "run" / "config.yaml"
 
 def load_config(path=None):
     with open(path or DEFAULT_CONFIG) as f:
-        cfg = yaml.safe_load(f)
-    if cfg["task"] not in ("segment", "detect"):
-        raise SystemExit(f"[ERROR] task must be 'segment' or 'detect', got {cfg['task']!r}")
-    return cfg
+        return yaml.safe_load(f)
 
 
 def resolve(path):

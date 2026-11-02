@@ -14,16 +14,15 @@ from config import load_config, resolve, DEFAULT_CONFIG
 parser = argparse.ArgumentParser("Dataset generator")
 parser.add_argument("--config", type=str, default=str(DEFAULT_CONFIG))
 parser.add_argument("--headless", action="store_true", default=True, help="No window")
-parser.add_argument("--height", type=int)   # height, width, num_frames, distractors and data_dir override the config
+parser.add_argument("--height", type=int)   # height, width, num_frames and data_dir override the config
 parser.add_argument("--width",  type=int)
 parser.add_argument("--num_frames", type=int)
-parser.add_argument("--distractors", type=str)
 parser.add_argument("--data_dir", type=str)
 
 args, unknown_args = parser.parse_known_args()
 
 cfg = load_config(args.config)
-for key in ("height", "width", "num_frames", "distractors", "data_dir"):
+for key in ("height", "width", "num_frames", "data_dir"):
     if getattr(args, key) is None:
         setattr(args, key, cfg[key])
 
@@ -47,17 +46,17 @@ import usd_scene
 from camera_effects import apply_camera_effects
 from domain_randomization import SceneRandomizer
 
-rep.settings.carb_settings("/omni/replicator/RTSubframes", 4)
+RT_SUBFRAMES = 4
+
+rep.settings.carb_settings("/omni/replicator/RTSubframes", RT_SUBFRAMES)
 if cfg.get("seed") is not None:
     rep.set_global_seed(cfg["seed"])
-
-RT_SUBFRAMES = 4
 
 ASSET_PATHS = cfg["assets"]
 INSTANCES_PER_ASSET = cfg["instances_per_asset"]
 
 
-DISTRACTORS_WAREHOUSE = 2 * [
+DISTRACTORS = [
     "/Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd",
     "/Isaac/Environments/Simple_Warehouse/Props/S_WetFloorSign.usd",
     "/Isaac/Environments/Simple_Warehouse/Props/SM_BarelPlastic_A_01.usd",
@@ -86,9 +85,6 @@ DISTRACTORS_WAREHOUSE = 2 * [
     "/Isaac/Environments/Simple_Warehouse/Props/SM_PushcartA_02.usd",
     "/Isaac/Environments/Simple_Warehouse/Props/SM_RackPile_04.usd",
     "/Isaac/Environments/Simple_Warehouse/Props/SM_RackPile_03.usd",
-]
-
-DISTRACTORS_ADDITIONAL = [
     "/Isaac/Environments/Hospital/Props/Pharmacy_Low.usd",
     "/Isaac/Environments/Hospital/Props/SM_BedSideTable_01b.usd",
     "/Isaac/Environments/Hospital/Props/SM_BooksSet_26.usd",
@@ -180,17 +176,8 @@ def prefix_with_isaac_asset_server(relative_path):
     return assets_root_path + relative_path
 
 
-def full_distractors_list(distractor_type="warehouse"):
-    full_dist_list = []
-    if distractor_type == "warehouse":
-        for d in DISTRACTORS_WAREHOUSE:
-            full_dist_list.append(prefix_with_isaac_asset_server(d))
-    elif distractor_type == "additional":
-        for d in DISTRACTORS_ADDITIONAL:
-            full_dist_list.append(prefix_with_isaac_asset_server(d))
-    else:
-        print("No Distractors being added")
-    return full_dist_list
+def full_distractors_list():
+    return [prefix_with_isaac_asset_server(d) for d in DISTRACTORS]
 
 
 def full_textures_list():
@@ -199,16 +186,15 @@ def full_textures_list():
 
 def load_assets():
     assets = {}
-    for entry in ASSET_PATHS:
-        rel, lying = (entry, 0.0) if isinstance(entry, str) else (entry["path"], entry.get("lying", 0.0))
+    for rel in ASSET_PATHS:
         path = resolve(rel).resolve()
         if not path.exists():
             raise FileNotFoundError(f"Asset not found: {path}")
         stage = Usd.Stage.Open(str(path))
         cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_])
         box = cache.ComputeWorldBound(stage.GetDefaultPrim()).ComputeAlignedRange()
-        assets[path.stem] = {"url": f"file://{path}", "bbox_min": np.array(box.GetMin()), "bbox_max": np.array(box.GetMax()), "lying": lying}
-        print(f"[asset] {path.stem}: size={tuple(round(x, 3) for x in box.GetSize())} m, lying {lying}")
+        assets[path.stem] = {"url": f"file://{path}", "bbox_min": np.array(box.GetMin()), "bbox_max": np.array(box.GetMax())}
+        print(f"[asset] {path.stem}: size={tuple(round(x, 3) for x in box.GetSize())} m")
     return assets
 
 
@@ -217,9 +203,8 @@ def add_all_assets(assets):
         rep.create.from_usd(asset["url"], semantics=[("class", label)], count=INSTANCES_PER_ASSET)
 
 
-def add_distractors(distractor_type="warehouse"):
-    full_distractors = full_distractors_list(distractor_type)
-    distractors = [rep.create.from_usd(p, count=1) for p in full_distractors]
+def add_distractors():
+    distractors = [rep.create.from_usd(p, count=1) for p in full_distractors_list()]
     return rep.create.group(distractors)
 
 
@@ -245,7 +230,7 @@ def main():
 
     assets = load_assets()
     add_all_assets(assets)
-    add_distractors(distractor_type=args.distractors)
+    add_distractors()
 
     update_semantics(stage=stage, keep_semantics=list(assets.keys()))
 
