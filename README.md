@@ -160,8 +160,10 @@ applies tests/track_filter.py, which drops any track shorter than 15 frames, bel
 mean confidence or covering less than half a percent of the frame, and runs at conf 0.70.
 
 That threshold is a measured choice, not a default: it removes 98 percent of the false
-keys and 59 percent of the false blenders for 1 to 3 percent of the true detections. The
-numbers behind it, and what still fails, are in results/RESULTS.txt.
+keys and 59 percent of the false blenders for 1 to 3 percent of the true detections. What
+it does not fix is a coffee maker seen close up, a glass carafe with a handle, which
+reaches 0.79 as a blender, and keys lying flat on dark varnished wood, which go missing
+in most frames.
 
 ## Repo layout
 
@@ -179,8 +181,9 @@ results/       weights, training curves, annotated videos and the write-up
 
 The four objects were rebuilt from phone photographs rather than downloaded: proportions
 solved by PnP and bundle adjustment, textures projected from the photos, brand marks
-removed. blender/README.md documents how each one was reproduced and what scale
-assumptions it rests on.
+removed. Each one is scaled from a measured reference in its own photos, a known box
+height, a calibrated sheet of paper, a published jar width, so an object in the dataset
+is the size of the real thing.
 
 The HDRIs come from Poly Haven, polyhaven.com, under CC0, downscaled to 2k. The
 distractor props and surface textures are referenced from the Isaac Sim asset server at
