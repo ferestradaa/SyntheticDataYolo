@@ -1,12 +1,14 @@
-# synth_yolo
+# Synthetic Data Generation for Detection/Segmentation Models
 
-A synthetic data pipeline for YOLO object detection and segmentation, built on NVIDIA
-Isaac Sim Replicator. It renders randomized frames of four household objects, converts
-the instance masks into YOLO labels and splits them into a ready-to-train dataset.
+Generating synthetic data pipeline for YOLO object detection and segmentation, built on NVIDIA
+Isaac Sim Replicator. It renders randomized frames of any real life object using its 3D model, converts
+the instance masks into YOLO labels and splits them into a ready2train dataset.
 
 The models in results/weights are trained only on these synthetic frames. No real image
 is ever used for training, and the real phone videos in tests/videos are used only for
 measuring.
+
+All 3D models used in this repo were fully modeled using Claude and an image as reference. 
 
 ![rendered frame, instance mask, YOLO labels and raw geometry — four views of one sample](docs/data_sample.jpg)
 
@@ -14,66 +16,45 @@ https://github.com/ferestradaa/SyntheticDataYolo/raw/main/docs/synthetic_linked.
 
 ## How it works
 
-run/generate_data.sh runs four stages in order, all driven by run/config.yaml.
+- `run/generate_data.sh` runs four stages in order, all driven by run/config.yaml.
 
-src/generate_data.py launches Isaac Sim headless with path tracing, loads the assets
+- `src/generate_data.py` launches Isaac Sim headless with path tracing, loads the assets
 plus 62 Isaac warehouse, hospital and office props as distractors, and renders the
 requested number of randomized frames with their instance masks.
 
-src/extract_masks.py splits each instance segmentation image into one binary mask per
+- `src/extract_masks.py` splits each instance segmentation image into one binary mask per
 instance under masks, and writes classes.txt.
 
-src/make_labels.py traces every mask into a YOLO polygon label under labels_raw, writing
+- `src/make_labels.py` traces every mask into a YOLO polygon label under labels_raw, writing
 an empty label for frames with no objects so YOLO reads them as negatives.
 
-src/split_dataset.py hardlinks the pairs into images and labels under train and val,
+- `src/split_dataset.py` hardlinks the pairs into images and labels under train and val,
 writes data.yaml, and with --clean keeps one example in sample_check and deletes the raw
 files.
 
 ### Randomization
 
-Every frame is randomized from scratch, across three modules.
+`src/domain_randomization.py` handles layout, object poses and scales, which instances are
+visible, distractor placement, camera position, framing and focal length.
 
-src/domain_randomization.py handles layout, object poses and scales, which instances are
-visible, distractor placement, camera position, framing and focal length. The camera
-never looks from below, and shots are drawn as 35 percent close, 40 percent medium and
-25 percent wide.
-
-src/lighting.py drives a dome light from one of six styles: overcast, window, indoor,
-mixed, backlit and dim. Each one sets colour temperature, how many local lights are
-added, and whether there is a sun, whose angular diameter decides how hard the shadows
-come out.
+`src/lighting.py` drives a dome light from one of six styles: overcast, window, indoor,
+mixed, backlit and dim. 
 
 src/camera_effects.py applies a lens and sensor pass to the rendered image: barrel
 distortion, chromatic aberration, defocus and motion blur, bloom, vignette, exposure and
-white balance, sensor noise and JPEG recompression. The untouched render is kept under
-raw so this pass can be re-run or compared.
+white balance, sensor noise and JPEG recompression. 
 
-The ranges for all of it live at the top of each module, not in the config, so a dataset
-is described by the code that made it.
-
-## Requirements
-
-Isaac Sim 4.2, the version with the omni.isaac namespace, run through its own python.sh.
-An NVIDIA GPU, and access to the Isaac Nucleus asset server for the distractor props.
-
-For training and video evaluation, a separate Python environment:
-
-```bash
-pip install ultralytics
-```
-
-The generation stages use only what ships inside Isaac Sim: numpy, opencv, PIL, PyYAML
-and pxr.
 
 ## Quick start
 
-Point the config at your Isaac Sim install and pick a size. The path has to be absolute,
-a tilde does not expand where the script uses it, and ISAAC_SIM_PATH in the environment
-overrides whatever the config says.
+1. Install Isaac Sim 4.2/4.5 [here](https://web.archive.org/web/20260103134909/https://docs.isaacsim.omniverse.nvidia.com/4.5.0/installation/download.html)
+
+2. Point the config at your Isaac Sim install
+   
+3. Setup the large of the dataset to generate (numer of frames and dir output name). Check `run/config.yaml`
 
 ```
-isaac_sim_path: /opt/isaac-sim-4.2.0
+isaac_sim_path: /path/to/your/isaacsim/installation
 data_dir: data_generated/data_1000
 num_frames: 1000
 ```
@@ -106,34 +87,9 @@ data_generated/data_1000/
   sample_check/        one frame with its label, mask and raw render
 ```
 
-![synthetic frames with their polygons](docs/dataset_sample.jpg)
-
-## Configuration
-
-isaac_sim_path is the absolute path to the Isaac Sim install. data_dir is where the
-dataset is written, relative to the repo root. assets lists one .usd per class, and the
-class name is the file name without extension. instances_per_asset is how many copies of
-each asset are spawned, and each frame shows between zero and that many of each.
-num_frames is how many frames to render. width and height are the render size, always
-square, since every frame is then cropped to a random phone aspect. train_ratio is the
-fraction of the pairs that go to train. seed is optional and makes the randomization and
-the lens and sensor pass reproducible.
-
 Adding a class is one line under assets plus the .usd in meshes. Nothing else needs to
 change, because the class list is discovered from the rendered semantics.
 
-## Checking a dataset
-
-src/validate_dataset.py cross-checks the labels against frames_meta.json and reports the
-share of frames that are unusable, so a bad run is caught before training.
-
-```bash
-$ISAAC_SIM_PATH/python.sh src/validate_dataset.py --data_dir data_generated/data_1000
-```
-
-It flags frames whose labels name a class that was supposed to be hidden, frames missing
-the object the shot was framed around, empty labels that were not meant to be negatives,
-frames that came out too dark or clipped to white, and frames where every label is tiny.
 
 ## Training
 
@@ -146,9 +102,7 @@ yolo segment train model=yolo11n-seg.pt data=data_generated/data_2000b/data.yaml
   hsv_h=0.03 hsv_s=0.7 hsv_v=0.5 degrees=10 translate=0.15 scale=0.7 \
   mosaic=1.0 mixup=0.15 copy_paste=0.15 erasing=0.4
 ```
-
-Swap segment and yolo11n-seg.pt for detect and yolo11n.pt to train the box model. The
-final models were trained on 2000 frames, 1800 train and 200 val, rendered at 960x960
+The final models were trained on 2000 frames, 1800 train and 200 val, rendered at 960x960
 before the random phone crop.
 
 ## Running on real video
@@ -161,11 +115,6 @@ This writes an annotated mp4 and a json dump of the surviving tracks next to it.
 applies tests/track_filter.py, which drops any track shorter than 15 frames, below 0.55
 mean confidence or covering less than half a percent of the frame, and runs at conf 0.70.
 
-That threshold is a measured choice, not a default: it removes 98 percent of the false
-keys and 59 percent of the false blenders for 1 to 3 percent of the true detections. What
-it does not fix is a coffee maker seen close up, a glass carafe with a handle, which
-reaches 0.79 as a blender, and keys lying flat on dark varnished wood, which go missing
-in most frames.
 
 ## Repo layout
 
@@ -183,9 +132,7 @@ results/       weights, training curves, annotated videos and the write-up
 
 The four objects were rebuilt from phone photographs rather than downloaded: proportions
 solved by PnP and bundle adjustment, textures projected from the photos, brand marks
-removed. Each one is scaled from a measured reference in its own photos, a known box
-height, a calibrated sheet of paper, a published jar width, so an object in the dataset
-is the size of the real thing.
+removed. 
 
 The HDRIs come from Poly Haven, polyhaven.com, under CC0, downscaled to 2k. The
 distractor props and surface textures are referenced from the Isaac Sim asset server at
