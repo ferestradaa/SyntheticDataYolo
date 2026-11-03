@@ -8,7 +8,9 @@ The models in results/weights are trained only on these synthetic frames. No rea
 is ever used for training, and the real phone videos in tests/videos are used only for
 measuring.
 
-![detections on real video](docs/demo.gif)
+![rendered frame, instance mask, YOLO labels and raw geometry — four views of one sample](docs/data_sample.jpg)
+
+https://github.com/ferestradaa/SyntheticDataYolo/raw/main/docs/synthetic_linked.mp4
 
 ## How it works
 
